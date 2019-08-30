@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">SigStrMap</string>
+    <string name="location_permission_rationale">Location is required in order to populate the WiFi heat map.</string>
+</resources>
