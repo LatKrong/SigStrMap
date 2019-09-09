@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">SigStrMap</string>
     <string name="location_permission_rationale">Location is required in order to populate the WiFi heat map.</string>
+
+    <string name="settings">Settings</string>
+    <string name="settings_update_interval_in_millis_key" translatable="false">update_interval_in_millis</string>
+    <string name="settings_update_interval_in_millis_title" translatable="false">Update Interval (ms)</string>
+
 </resources>

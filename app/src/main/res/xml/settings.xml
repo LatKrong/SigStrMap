@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SeekBarPreference
+        android:defaultValue="@integer/settings_update_interval_in_millis_default"
+        android:key="@string/settings_update_interval_in_millis_key"
+        android:max="1000"
+        android:title="@string/settings_update_interval_in_millis_title" />
+</PreferenceScreen>

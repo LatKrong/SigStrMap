@@ -21,6 +21,14 @@ area.
 This is my starter Android project, hence I am still experiencing with different things, though the
 end product is probably not something useful.
 
+## What has been done?
+
+* Created a custom view for displaying the heat map.
+* Draw heat map on Canvas.
+* Getting location and WiFI signal strength information.
+* Handling permissions properly.
+* A simple settings view.
+
 ## What's next?
 
-* Add a setting page.
+* Utilize SavedInstanceState.

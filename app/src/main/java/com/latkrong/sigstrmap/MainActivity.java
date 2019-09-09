@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -11,6 +12,10 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.preference.PreferenceManager;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 
 import com.latkrong.sigstrmap.location.HeatMapManager;
 import com.latkrong.sigstrmap.location.WiFiHeatMapManager;
@@ -22,14 +27,18 @@ import pub.devrel.easypermissions.AfterPermissionGranted;
 import pub.devrel.easypermissions.AppSettingsDialog;
 import pub.devrel.easypermissions.EasyPermissions;
 
-public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks
+public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks,
+        SharedPreferences.OnSharedPreferenceChangeListener
 {
-    static final int DEFAULT_UPDATE_INTERVAL_IN_MILLIS = 0;
-    static final int DEFAULT_MIN_DISTANCE = 0;
-    static final int RC_LOCATION = 1;
+    private static final int DEFAULT_MIN_DISTANCE = 0;
+    private static final int RC_LOCATION = 1;
 
-    WiFiHeatMapView heatMap;
-    HeatMapManager heatMapManager;
+    private final LocationListener LOCATION_LISTENER = new MainLocationListener();
+
+    private WiFiHeatMapView heatMap;
+    private HeatMapManager heatMapManager;
+
+    private int updateIntervalMillis = 0;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState)
@@ -37,11 +46,51 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        final SharedPreferences sharedPreferences =
+                PreferenceManager.getDefaultSharedPreferences(this);
+        sharedPreferences.registerOnSharedPreferenceChangeListener(this);
+
         this.heatMap = findViewById(R.id.wiFiHeatMap);
         this.heatMapManager = new WiFiHeatMapManager(
                 (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE));
 
+        this.updateIntervalMillis = sharedPreferences
+                .getInt(getString(R.string.settings_update_interval_in_millis_key),
+                        getResources()
+                                .getInteger(R.integer.settings_update_interval_in_millis_default));
+
         setupLocationListener();
+    }
+
+    @Override
+    protected void onDestroy()
+    {
+        super.onDestroy();
+
+        final SharedPreferences sharedPreferences =
+                PreferenceManager.getDefaultSharedPreferences(this);
+        sharedPreferences.unregisterOnSharedPreferenceChangeListener(this);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(final Menu menu)
+    {
+        final MenuInflater menuInflater = getMenuInflater();
+        menuInflater.inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(final MenuItem item)
+    {
+        switch (item.getItemId())
+        {
+            case R.id.settings:
+                final Intent startSettingsActivity = new Intent(this, SettingsActivity.class);
+                startActivity(startSettingsActivity);
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     @Override
@@ -91,9 +140,9 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             final LocationManager locationManager =
                     (LocationManager)getSystemService(Context.LOCATION_SERVICE);
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-                                                   DEFAULT_UPDATE_INTERVAL_IN_MILLIS,
+                                                   this.updateIntervalMillis,
                                                    DEFAULT_MIN_DISTANCE,
-                                                   new MainLocationListener());
+                                                   LOCATION_LISTENER);
         }
         else
         {
@@ -102,6 +151,28 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
                     this.getString(R.string.location_permission_rationale),
                     RC_LOCATION,
                     Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+    }
+
+    @Override
+    @SuppressLint("MissingPermission")
+    public void onSharedPreferenceChanged(final SharedPreferences sharedPreferences,
+                                          final String key)
+    {
+        if (key.equals(getString(R.string.settings_update_interval_in_millis_key)))
+        {
+            this.updateIntervalMillis = sharedPreferences
+                    .getInt(key,
+                            getResources().getInteger(
+                                    R.integer.settings_update_interval_in_millis_default));
+
+            final LocationManager locationManager =
+                    (LocationManager)getSystemService(Context.LOCATION_SERVICE);
+            locationManager.removeUpdates(LOCATION_LISTENER);
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                                                   this.updateIntervalMillis,
+                                                   DEFAULT_MIN_DISTANCE,
+                                                   LOCATION_LISTENER);
         }
     }
 
