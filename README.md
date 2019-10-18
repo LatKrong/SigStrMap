@@ -28,7 +28,8 @@ end product is probably not something useful.
 * Getting location and WiFI signal strength information.
 * Handling permissions properly.
 * A simple settings view.
+* Save instance state.
 
 ## What's next?
 
-* Utilize SavedInstanceState.
+* Save/load heat map to disk.
