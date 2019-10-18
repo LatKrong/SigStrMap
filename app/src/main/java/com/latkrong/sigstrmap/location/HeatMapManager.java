@@ -33,6 +33,8 @@ public abstract class HeatMapManager
 
     public void addLocation(final Location location)
     {
+        if (currentIndex() == -1) { return; }
+
         if (this.longitudeDelta == 0.0)
         {
             initializeDelta(location.getLatitude(), MIN_DISTANCE_APART_IN_METERS);

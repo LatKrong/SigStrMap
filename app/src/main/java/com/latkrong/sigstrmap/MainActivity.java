@@ -17,8 +17,10 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.latkrong.sigstrmap.location.HeatMapManager;
-import com.latkrong.sigstrmap.location.WiFiHeatMapManager;
+import com.latkrong.sigstrmap.location.WifiHeatMapManager;
 import com.latkrong.sigstrmap.view.WiFiHeatMapView;
 
 import java.util.List;
@@ -30,6 +32,8 @@ import pub.devrel.easypermissions.EasyPermissions;
 public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks,
         SharedPreferences.OnSharedPreferenceChangeListener
 {
+    private static final String HEAT_MAP_MANAGER_SAVE_KEY = "HeatMapManager";
+
     private static final int DEFAULT_MIN_DISTANCE = 0;
     private static final int RC_LOCATION = 1;
 
@@ -39,6 +43,10 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
     private HeatMapManager heatMapManager;
 
     private int updateIntervalMillis = 0;
+
+    private static final Gson GSON = new GsonBuilder()
+            .enableComplexMapKeySerialization()
+            .create();
 
     @Override
     protected void onCreate(final Bundle savedInstanceState)
@@ -51,12 +59,24 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         sharedPreferences.registerOnSharedPreferenceChangeListener(this);
 
         this.heatMap = findViewById(R.id.wiFiHeatMap);
-        this.heatMapManager = new WiFiHeatMapManager(
-                (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE));
+
+        if (savedInstanceState == null ||
+                !savedInstanceState.containsKey(HEAT_MAP_MANAGER_SAVE_KEY))
+        {
+            this.heatMapManager = new WifiHeatMapManager(
+                    (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE));
+        }
+        else
+        {
+            this.heatMapManager =
+                    GSON.fromJson(savedInstanceState.getString(HEAT_MAP_MANAGER_SAVE_KEY),
+                                  WifiHeatMapManager.class);
+            ((WifiHeatMapManager)this.heatMapManager).setWifiManager(
+                    (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE));
+        }
 
         this.updateIntervalMillis = sharedPreferences
-                .getInt(getString(R.string.settings_update_interval_in_millis_key),
-                        getResources()
+                .getInt(getString(R.string.settings_update_interval_in_millis_key), getResources()
                                 .getInteger(R.integer.settings_update_interval_in_millis_default));
 
         setupLocationListener();
@@ -70,6 +90,13 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         final SharedPreferences sharedPreferences =
                 PreferenceManager.getDefaultSharedPreferences(this);
         sharedPreferences.unregisterOnSharedPreferenceChangeListener(this);
+    }
+
+    @Override
+    public void onSaveInstanceState(final Bundle outState)
+    {
+        super.onSaveInstanceState(outState);
+        outState.putString(HEAT_MAP_MANAGER_SAVE_KEY, GSON.toJson(this.heatMapManager));
     }
 
     @Override

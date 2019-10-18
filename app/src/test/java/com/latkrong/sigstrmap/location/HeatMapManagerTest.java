@@ -62,6 +62,10 @@ public class HeatMapManagerTest
                     HeatMapManager.normalizeCoordinate(TEST_START_LONGITUDE,
                                                        testHeatMapManager.getLongitudeDelta()) +
                             2.5 * testHeatMapManager.getLongitudeDelta(), 6);
+        // Adding invalid index.
+        addLocation(TEST_START_LATITUDE, TEST_START_LONGITUDE, -1);
+        addLocation(TEST_START_LATITUDE + 6 * testHeatMapManager.getLatitudeDelta(),
+                    TEST_START_LONGITUDE + 6 * testHeatMapManager.getLongitudeDelta(), -1);
 
         // Act
 
