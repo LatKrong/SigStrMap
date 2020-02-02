@@ -13,9 +13,11 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.preference.PreferenceManager;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -23,6 +25,8 @@ import com.latkrong.sigstrmap.location.HeatMapManager;
 import com.latkrong.sigstrmap.location.WifiHeatMapManager;
 import com.latkrong.sigstrmap.view.WiFiHeatMapView;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 import pub.devrel.easypermissions.AfterPermissionGranted;
@@ -32,6 +36,7 @@ import pub.devrel.easypermissions.EasyPermissions;
 public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks,
         SharedPreferences.OnSharedPreferenceChangeListener
 {
+    private static final String HEAT_MAP_FILE_EXTENSION = ".heatmap";
     private static final String HEAT_MAP_MANAGER_SAVE_KEY = "HeatMapManager";
 
     private static final int DEFAULT_MIN_DISTANCE = 0;
@@ -39,6 +44,7 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
 
     private final LocationListener LOCATION_LISTENER = new MainLocationListener();
 
+    private WifiManager wifiManager;
     private WiFiHeatMapView heatMap;
     private HeatMapManager heatMapManager;
 
@@ -59,25 +65,25 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         sharedPreferences.registerOnSharedPreferenceChangeListener(this);
 
         this.heatMap = findViewById(R.id.wiFiHeatMap);
+        this.wifiManager =
+                (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
         if (savedInstanceState == null ||
                 !savedInstanceState.containsKey(HEAT_MAP_MANAGER_SAVE_KEY))
         {
-            this.heatMapManager = new WifiHeatMapManager(
-                    (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE));
+            this.heatMapManager = new WifiHeatMapManager(this.wifiManager);
         }
         else
         {
             this.heatMapManager =
                     GSON.fromJson(savedInstanceState.getString(HEAT_MAP_MANAGER_SAVE_KEY),
                                   WifiHeatMapManager.class);
-            ((WifiHeatMapManager)this.heatMapManager).setWifiManager(
-                    (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE));
+            ((WifiHeatMapManager)this.heatMapManager).setWifiManager(this.wifiManager);
         }
 
         this.updateIntervalMillis = sharedPreferences
                 .getInt(getString(R.string.settings_update_interval_in_millis_key), getResources()
-                                .getInteger(R.integer.settings_update_interval_in_millis_default));
+                        .getInteger(R.integer.settings_update_interval_in_millis_default));
 
         setupLocationListener();
     }
@@ -115,6 +121,25 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
             case R.id.settings:
                 final Intent startSettingsActivity = new Intent(this, SettingsActivity.class);
                 startActivity(startSettingsActivity);
+                return true;
+            case R.id.save:
+                final String filename = this.wifiManager.getConnectionInfo().getSSID()
+                        .replaceAll("\"", "") + HEAT_MAP_FILE_EXTENSION;
+                final String serialized = GSON.toJson(this.heatMapManager);
+                try (final FileOutputStream fout = this.getApplicationContext()
+                        .openFileOutput(filename, Context.MODE_PRIVATE))
+                {
+                    fout.write(serialized.getBytes());
+                    Toast.makeText(this, "Data saved to [" + filename + "]", Toast.LENGTH_LONG)
+                            .show();
+                }
+                catch (final IOException e)
+                {
+                    Toast.makeText(this, "Failed to save data: " + e.getMessage(),
+                                   Toast.LENGTH_LONG)
+                            .show();
+                    Log.e("DATA_STORAGE", "Failed to save data.", e);
+                }
                 return true;
         }
         return super.onOptionsItemSelected(item);
