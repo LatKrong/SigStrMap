@@ -29,7 +29,11 @@ end product is probably not something useful.
 * Handling permissions properly.
 * A simple settings view.
 * Save instance state.
+* Save heat map to disk.
+* Listing saved heat map in the main view.
+* Ability to load an existing heat map from the main view.
+* Ability to add a new heat map through main view.
 
 ## What's next?
 
-* Save/load heat map to disk.
+* Ability to delete a heat map.

@@ -1,58 +1,27 @@
 package com.latkrong.sigstrmap;
 
-import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
+import android.support.design.widget.FloatingActionButton;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.preference.PreferenceManager;
-import android.util.Log;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.widget.Toast;
+import android.support.v7.widget.DividerItemDecoration;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.view.View;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.latkrong.sigstrmap.location.HeatMapManager;
-import com.latkrong.sigstrmap.location.WifiHeatMapManager;
-import com.latkrong.sigstrmap.view.WiFiHeatMapView;
+import com.latkrong.sigstrmap.adapter.HeatmapItemAdapter;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.List;
-
-import pub.devrel.easypermissions.AfterPermissionGranted;
-import pub.devrel.easypermissions.AppSettingsDialog;
-import pub.devrel.easypermissions.EasyPermissions;
-
-public class MainActivity extends AppCompatActivity implements EasyPermissions.PermissionCallbacks,
-        SharedPreferences.OnSharedPreferenceChangeListener
+public class MainActivity extends AppCompatActivity
+        implements HeatmapItemAdapter.ListItemClickListener
 {
-    private static final String HEAT_MAP_FILE_EXTENSION = ".heatmap";
-    private static final String HEAT_MAP_MANAGER_SAVE_KEY = "HeatMapManager";
+    private HeatmapItemAdapter heatmapItemAdapter;
+    private RecyclerView heatmapList;
 
-    private static final int DEFAULT_MIN_DISTANCE = 0;
-    private static final int RC_LOCATION = 1;
-
-    private final LocationListener LOCATION_LISTENER = new MainLocationListener();
-
-    private WifiManager wifiManager;
-    private WiFiHeatMapView heatMap;
-    private HeatMapManager heatMapManager;
-
-    private int updateIntervalMillis = 0;
-
-    private static final Gson GSON = new GsonBuilder()
-            .enableComplexMapKeySerialization()
-            .create();
+    private FloatingActionButton addHeatmap;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState)
@@ -60,199 +29,59 @@ public class MainActivity extends AppCompatActivity implements EasyPermissions.P
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        final SharedPreferences sharedPreferences =
-                PreferenceManager.getDefaultSharedPreferences(this);
-        sharedPreferences.registerOnSharedPreferenceChangeListener(this);
+        heatmapList = (RecyclerView)findViewById(R.id.heatmap_list);
+        heatmapList.setLayoutManager(new LinearLayoutManager(this));
+        heatmapList.setHasFixedSize(true);
+        heatmapList.addItemDecoration(new DividerItemDecoration(this.getApplicationContext(),
+                                                                DividerItemDecoration.VERTICAL));
 
-        this.heatMap = findViewById(R.id.wiFiHeatMap);
-        this.wifiManager =
+        heatmapItemAdapter = new HeatmapItemAdapter(this.getApplicationContext(),
+                                                    WifiHeatMapActivity.HEAT_MAP_FILE_EXTENSION,
+                                                    this);
+        heatmapList.setAdapter(heatmapItemAdapter);
+
+        final WifiManager wifiManager =
                 (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
-        if (savedInstanceState == null ||
-                !savedInstanceState.containsKey(HEAT_MAP_MANAGER_SAVE_KEY))
-        {
-            this.heatMapManager = new WifiHeatMapManager(this.wifiManager);
-        }
-        else
-        {
-            this.heatMapManager =
-                    GSON.fromJson(savedInstanceState.getString(HEAT_MAP_MANAGER_SAVE_KEY),
-                                  WifiHeatMapManager.class);
-            ((WifiHeatMapManager)this.heatMapManager).setWifiManager(this.wifiManager);
-        }
-
-        this.updateIntervalMillis = sharedPreferences
-                .getInt(getString(R.string.settings_update_interval_in_millis_key), getResources()
-                        .getInteger(R.integer.settings_update_interval_in_millis_default));
-
-        setupLocationListener();
-    }
-
-    @Override
-    protected void onDestroy()
-    {
-        super.onDestroy();
-
-        final SharedPreferences sharedPreferences =
-                PreferenceManager.getDefaultSharedPreferences(this);
-        sharedPreferences.unregisterOnSharedPreferenceChangeListener(this);
-    }
-
-    @Override
-    public void onSaveInstanceState(final Bundle outState)
-    {
-        super.onSaveInstanceState(outState);
-        outState.putString(HEAT_MAP_MANAGER_SAVE_KEY, GSON.toJson(this.heatMapManager));
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(final Menu menu)
-    {
-        final MenuInflater menuInflater = getMenuInflater();
-        menuInflater.inflate(R.menu.main_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(final MenuItem item)
-    {
-        switch (item.getItemId())
-        {
-            case R.id.settings:
-                final Intent startSettingsActivity = new Intent(this, SettingsActivity.class);
-                startActivity(startSettingsActivity);
-                return true;
-            case R.id.save:
-                final String filename = this.wifiManager.getConnectionInfo().getSSID()
-                        .replaceAll("\"", "") + HEAT_MAP_FILE_EXTENSION;
-                final String serialized = GSON.toJson(this.heatMapManager);
-                try (final FileOutputStream fout = this.getApplicationContext()
-                        .openFileOutput(filename, Context.MODE_PRIVATE))
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setMessage(String.format("Creating heatmap for %s?",
+                                         wifiManager.getConnectionInfo().getSSID()))
+                .setPositiveButton("Yes", new DialogInterface.OnClickListener()
                 {
-                    fout.write(serialized.getBytes());
-                    Toast.makeText(this, "Data saved to [" + filename + "]", Toast.LENGTH_LONG)
-                            .show();
-                }
-                catch (final IOException e)
-                {
-                    Toast.makeText(this, "Failed to save data: " + e.getMessage(),
-                                   Toast.LENGTH_LONG)
-                            .show();
-                    Log.e("DATA_STORAGE", "Failed to save data.", e);
-                }
-                return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
+                    @Override
+                    public void onClick(final DialogInterface dialog, final int id)
+                    {
+                        final Intent intent =
+                                new Intent(MainActivity.this, WifiHeatMapActivity.class);
+                        startActivity(intent);
+                    }
+                }).setNegativeButton("Cancel", null);
+        final AlertDialog addHeatmapDialog = builder.create();
 
-    @Override
-    public void onRequestPermissionsResult(
-            final int requestCode, final String[] permissions, final int[] grantResults)
-    {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this);
-    }
-
-    @Override
-    public void onPermissionsGranted(final int requestCode, @NonNull final List<String> perms) {}
-
-    @Override
-    public void onPermissionsDenied(final int requestCode, @NonNull final List<String> perms)
-    {
-        if (EasyPermissions.somePermissionPermanentlyDenied(this, perms))
+        addHeatmap = findViewById(R.id.add_heatmap);
+        addHeatmap.setOnClickListener(new View.OnClickListener()
         {
-            new AppSettingsDialog.Builder(this).build().show();
-        }
-        else
-        {
-            finishAndRemoveTask();
-        }
-    }
-
-    @Override
-    public void onActivityResult(final int requestCode, final int resultCode, final Intent data)
-    {
-        super.onActivityResult(requestCode, resultCode, data);
-
-        if (requestCode == AppSettingsDialog.DEFAULT_SETTINGS_REQ_CODE)
-        {
-            if (!EasyPermissions.hasPermissions(this, Manifest.permission.ACCESS_FINE_LOCATION))
+            @Override
+            public void onClick(final View view)
             {
-                finishAndRemoveTask();
+                addHeatmapDialog.show();
             }
-        }
-    }
-
-    @AfterPermissionGranted(RC_LOCATION)
-    @SuppressLint("MissingPermission")
-    private void setupLocationListener()
-    {
-        if (EasyPermissions.hasPermissions(this, Manifest.permission.ACCESS_FINE_LOCATION))
-        {
-            final LocationManager locationManager =
-                    (LocationManager)getSystemService(Context.LOCATION_SERVICE);
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-                                                   this.updateIntervalMillis,
-                                                   DEFAULT_MIN_DISTANCE,
-                                                   LOCATION_LISTENER);
-        }
-        else
-        {
-            EasyPermissions.requestPermissions(
-                    this,
-                    this.getString(R.string.location_permission_rationale),
-                    RC_LOCATION,
-                    Manifest.permission.ACCESS_FINE_LOCATION);
-        }
+        });
     }
 
     @Override
-    @SuppressLint("MissingPermission")
-    public void onSharedPreferenceChanged(final SharedPreferences sharedPreferences,
-                                          final String key)
+    protected void onResume()
     {
-        if (key.equals(getString(R.string.settings_update_interval_in_millis_key)))
-        {
-            this.updateIntervalMillis = sharedPreferences
-                    .getInt(key,
-                            getResources().getInteger(
-                                    R.integer.settings_update_interval_in_millis_default));
-
-            final LocationManager locationManager =
-                    (LocationManager)getSystemService(Context.LOCATION_SERVICE);
-            locationManager.removeUpdates(LOCATION_LISTENER);
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-                                                   this.updateIntervalMillis,
-                                                   DEFAULT_MIN_DISTANCE,
-                                                   LOCATION_LISTENER);
-        }
+        super.onResume();
+        this.heatmapItemAdapter.refreshFileList(this.getApplicationContext());
     }
 
-    private class MainLocationListener implements LocationListener
+    @Override
+    public void onListItemClick(final String filename)
     {
-        @Override
-        public void onLocationChanged(final Location location)
-        {
-            heatMapManager.addLocation(location);
-
-            if (heatMap.getWidth() != 0 && heatMap.getHeight() != 0)
-            {
-                heatMap.setHeatMapCellDrawInfos(heatMapManager.getHeatMapCellDrawInfos(
-                        heatMap.getWidth(),
-                        heatMap.getHeight(),
-                        WiFiHeatMapView.DEFAULT_MARGIN));
-                heatMap.setDebugingString(heatMapManager.getDebugingString());
-                heatMap.invalidate();
-            }
-        }
-
-        @Override
-        public void onStatusChanged(final String provider, final int status, final Bundle extras) {}
-
-        @Override
-        public void onProviderEnabled(final String provider) {}
-
-        @Override
-        public void onProviderDisabled(final String provider) {}
+        final Intent intent =
+                new Intent(MainActivity.this, WifiHeatMapActivity.class);
+        intent.putExtra(WifiHeatMapActivity.HEAT_MAP_FILENAME, filename);
+        startActivity(intent);
     }
 }
