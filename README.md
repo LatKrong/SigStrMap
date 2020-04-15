@@ -33,7 +33,8 @@ end product is probably not something useful.
 * Listing saved heat map in the main view.
 * Ability to load an existing heat map from the main view.
 * Ability to add a new heat map through main view.
+* Ability to delete a heat map.
 
 ## What's next?
 
-* Ability to delete a heat map.
+* Polish UI.

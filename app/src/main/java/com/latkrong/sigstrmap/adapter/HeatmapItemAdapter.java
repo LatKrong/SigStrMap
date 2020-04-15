@@ -9,20 +9,26 @@ import android.widget.TextView;
 
 import com.latkrong.sigstrmap.R;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 public class HeatmapItemAdapter
         extends RecyclerView.Adapter<HeatmapItemAdapter.HeatmapItemViewHolder>
 {
-    private final ListItemClickListener onClickListener;
+    private final Context applicationContext;
     private final String fileExtension;
-    private String[] heatmapFiles;
+    private final ListItemChangeListener onChangeListener;
+
+    private List<String> heatmapFiles;
 
     public HeatmapItemAdapter(final Context applicationContext, final String fileExtension,
-                              final ListItemClickListener onClickListener)
+                              final ListItemChangeListener onChangeListener)
     {
+        this.applicationContext = applicationContext;
         this.fileExtension = fileExtension;
-        this.heatmapFiles = applicationContext.getFilesDir()
-                .list((dir, name) -> { return name.endsWith(this.fileExtension); });
-        this.onClickListener = onClickListener;
+        this.heatmapFiles = getFileList();
+        this.onChangeListener = onChangeListener;
     }
 
     @Override
@@ -37,25 +43,47 @@ public class HeatmapItemAdapter
     @Override
     public void onBindViewHolder(final HeatmapItemViewHolder holder, final int i)
     {
-        holder.bind(heatmapFiles[i]);
+        holder.bind(this.heatmapFiles.get(i));
     }
 
     @Override
     public int getItemCount()
     {
-        return heatmapFiles.length;
+        return this.heatmapFiles.size();
     }
 
-    public void refreshFileList(final Context applicationContext)
+    public void refreshFileList()
     {
-        heatmapFiles = applicationContext.getFilesDir()
-                .list((dir, name) -> { return name.endsWith(this.fileExtension); });
+        this.heatmapFiles = getFileList();
         notifyDataSetChanged();
     }
 
-    public interface ListItemClickListener
+    public void removeItemRequest(final int position)
     {
-        void onListItemClick(String filename);
+        this.onChangeListener.onListItemDeleteRequest(this.heatmapFiles.get(position), position);
+    }
+
+    public void removeItem(final int position)
+    {
+        applicationContext.deleteFile(heatmapFiles.get(position) + fileExtension);
+        heatmapFiles.remove(position);
+        notifyItemRemoved(position);
+    }
+
+    private List<String> getFileList()
+    {
+        return Arrays.asList(this.applicationContext.getFilesDir().list((dir, name) -> {
+            return name.endsWith(this.fileExtension);
+        })).stream().map(name -> {
+            return name.substring(0, name.length() - this.fileExtension.length());
+        }).sorted().collect(Collectors.toList());
+    }
+
+    public interface ListItemChangeListener
+    {
+        void onListItemSelected(String filename);
+
+        void onListItemDeleteRequest(String id, int position);
     }
 
     class HeatmapItemViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener
@@ -77,7 +105,8 @@ public class HeatmapItemAdapter
         @Override
         public void onClick(final View view)
         {
-            onClickListener.onListItemClick(heatmapItemView.getText().toString());
+            onChangeListener
+                    .onListItemSelected(heatmapItemView.getText().toString() + fileExtension);
         }
     }
 }
